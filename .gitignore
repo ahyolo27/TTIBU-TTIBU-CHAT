@@ -1,0 +1,24 @@
+# Environment variables
+.env
+
+# claude
+.claude/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Build outputs
+**/build/
+**/dist/
+**/target/
+
+# Dependencies
+**/node_modules/
+
+# OS
+.DS_Store
+
+Thumbs.db
+

@@ -1,0 +1,90 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ttibu_prod}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 15
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  task:
+    execution:
+      pool:
+        core-size: 10
+        max-size: 20
+        queue-capacity: 100
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      cookie:
+        secure: true
+        same-site: None
+
+app:
+  security:
+    csrf-mode: token
+
+# LiteLLM Configuration
+litellm:
+  base-url: ${LITELLM_BASE_URL:http://localhost:4000}
+  api-key: ${LITELLM_MASTER_KEY}
+  model: ${LITELLM_MODEL:gpt-3.5-turbo}
+
+# Summary API Configuration
+summary-api:
+  base-url: ${SUMMARY_API_BASE_URL:http://localhost:8001}
+  timeout-ms: ${SUMMARY_API_TIMEOUT_MS:10000}
+
+# GMS Configuration
+gms:
+  base-url: ${GMS_BASE_URL}
+
+# TTIBU Configuration
+ttibu:
+  litellm:
+    config-path: ${LITELLM_CONFIG_PATH:file:/app/litellm-config.yaml}
+    poll-ms: ${LITELLM_POLL_MS:30000}
+  crypto:
+    secret: ${TTIBU_CRYPTO_SECRET}
+
+logging:
+  level:
+    org.springframework.data.mongodb.core.MongoTemplate: WARN
+    org.hibernate.SQL: WARN
+    org.springframework.web: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: when-authorized
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

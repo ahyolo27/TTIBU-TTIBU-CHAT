@@ -1,0 +1,49 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ttibu_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+  task:
+    execution:
+      pool:
+        core-size: 10
+        max-size: 20
+        queue-capacity: 100
+
+server:
+  port: 8080
+  servlet:
+    session:
+      cookie:
+        secure: true
+        same-site: None
+
+app:
+  security:
+    csrf-mode: ignore
+
+ttibu:
+  litellm:
+    config-path: ../litellm-config.yaml
+    poll-ms: 30000
+
+logging:
+  level:
+    org.springframework.data.mongodb.core.MongoTemplate: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.springframework.web: DEBUG

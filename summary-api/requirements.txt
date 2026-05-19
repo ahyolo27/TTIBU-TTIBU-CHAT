@@ -1,0 +1,21 @@
+# --- FastAPI & 서버 ---
+fastapi
+uvicorn[standard]
+pydantic>=2.0
+
+# --- LLM (Qwen) ---
+transformers>=4.45.0
+torch>=2.1
+accelerate>=0.30
+sentencepiece
+
+# --- 키워드 추출 ---
+konlpy==0.6.0
+JPype1==1.5.0
+keybert
+sentence-transformers
+scikit-learn
+krwordrank
+
+# --- 기타 ---
+numpy<2.0

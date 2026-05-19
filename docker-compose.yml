@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile.pg
+    container_name: ttibu-postgres
+    environment:
+      POSTGRES_DB: ttibu_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      TZ: Asia/Seoul
+      LANG: C.UTF-8
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ttibu-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: ttibu-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ttibu-network
+    command: redis-server --appendonly yes
+
+  # Spring Boot Core API
+  core-api:
+    build:
+      context: ./core-api
+      dockerfile: Dockerfile
+    container_name: ttibu-core-api
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      GMS_BASE_URL: ${GMS_BASE_URL}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      LITELLM_BASE_URL: ${LITELLM_BASE_URL}
+      LITELLM_MODEL: ${LITELLM_MODEL}
+      TTIBU_CRYPTO_SECRET: ${TTIBU_CRYPTO_SECRET}
+      SUMMARY_API_BASE_URL: ${SUMMARY_API_BASE_URL}
+      SUMMARY_API_TIMEOUT_MS: ${SUMMARY_API_TIMEOUT_MS}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./litellm-config.yaml:/litellm-config.yaml
+    depends_on:
+      - postgres
+      - redis
+      - litellm
+      - summary-api
+    networks:
+      - ttibu-network
+    env_file:
+      - .env
+
+  # LiteLLM Proxy
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: ttibu-litellm
+    ports:
+      - "4000:4000"
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - LITELLM_LOG=INFO
+    volumes:
+      - ./litellm-config.yaml:/app/config.yaml
+    command: --config /app/config.yaml --port 4000
+    networks:
+      - ttibu-network
+
+  # FastAPI Summary Service
+  summary-api:
+    build:
+      context: ./summary-api
+      dockerfile: Dockerfile
+    container_name: ttibu-summary-api
+    ports:
+      - "8001:8001"
+    networks:
+      - ttibu-network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ttibu-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - core-api
+    networks:
+      - ttibu-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  ttibu-network:
+    driver: bridge

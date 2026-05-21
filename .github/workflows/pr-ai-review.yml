@@ -67,7 +67,8 @@ jobs:
             grep -Ev '(^|/)(dist|build|coverage|\.next|\.nuxt|node_modules)/' > review-files.txt || true
 
           if [ -s review-files.txt ]; then
-            git diff --unified=24 --no-ext-diff --pathspec-from-file=review-files.txt "${{ steps.pr.outputs.base_sha }}" pr-head > pr.diff
+            mapfile -t review_files < review-files.txt
+            git diff --unified=24 --no-ext-diff "${{ steps.pr.outputs.base_sha }}" pr-head -- "${review_files[@]}" > pr.diff
           else
             : > pr.diff
           fi

@@ -41,6 +41,19 @@ ttibu:
   litellm:
     config-path: ../litellm-config.yaml
     poll-ms: 30000
+  crypto:
+    secret: "ttibu-$$ttibu"
+
+summary-api:
+  base-url: http://localhost:8001
+
+litellm:
+  base-url: http://localhost:4000
+  api-key: ttibu
+  model: gpt-3.5-turbo
+
+gms:
+  base-url: http://localhost:8002
 
 logging:
   level:

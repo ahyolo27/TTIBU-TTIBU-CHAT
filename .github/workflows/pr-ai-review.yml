@@ -179,10 +179,7 @@ jobs:
               marker,
               process.env.REVIEW_BODY,
               '',
-              '---',
-              '## 🤖 AI PR Review',
-              `Reviewed at: ${reviewedAt} KST`,
-              `Model: ${process.env.MODEL}`,
+              `<sub>🤖 AI review · ${reviewedAt} KST · ${process.env.MODEL}</sub>`,
             ].join('\n');
 
             await github.rest.issues.createComment({

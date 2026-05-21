@@ -158,23 +158,30 @@ jobs:
         uses: actions/github-script@v7
         env:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
-          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
           REVIEW_BODY: ${{ steps.openai.outputs.review }}
           MODEL: ${{ vars.OPENAI_REVIEW_MODEL || 'gpt-5.3-codex' }}
         with:
           script: |
             const marker = '<!-- pr-ai-review -->';
             const issue_number = Number(process.env.PR_NUMBER);
+            const reviewedAt = new Intl.DateTimeFormat('sv-SE', {
+              timeZone: 'Asia/Seoul',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+            }).format(new Date()).replace(' ', ' ');
+
             const body = [
               marker,
-              '## AI PR Review',
-              '',
-              `- Event: \`${context.eventName}\``,
-              `- Commit: \`${process.env.HEAD_SHA}\``,
-              '',
               process.env.REVIEW_BODY,
               '',
-              `<!-- model: ${process.env.MODEL} -->`,
+              '---',
+              '## 🤖 AI PR Review',
+              `Reviewed at: ${reviewedAt} KST`,
+              `Model: ${process.env.MODEL}`,
             ].join('\n');
 
             await github.rest.issues.createComment({

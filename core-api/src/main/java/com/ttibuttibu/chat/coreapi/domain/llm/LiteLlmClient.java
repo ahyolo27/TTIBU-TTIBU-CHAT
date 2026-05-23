@@ -12,7 +12,5 @@ public interface LiteLlmClient {
      */
     void test(String apiKey, String model);
 
-    void gmsTest(String apiKey, String model, String provider);
-
-    Flux<String> createChatStream(String apiKey, String model, String provider, List<Map<String, String>> messages, boolean useLlm);
+    Flux<String> createChatStream(String apiKey, String model, List<Map<String, String>> messages);
 }

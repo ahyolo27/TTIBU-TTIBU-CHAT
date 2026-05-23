@@ -7,8 +7,9 @@ import com.ttibuttibu.chat.coreapi.common.error.ApiException;
 import com.ttibuttibu.chat.coreapi.common.error.ErrorCode;
 import com.ttibuttibu.chat.coreapi.common.sse.SseEmitterManager;
 import com.ttibuttibu.chat.coreapi.config.properties.AiProcessingProperties;
+import com.ttibuttibu.chat.coreapi.domain.catalog.entity.ModelCatalog;
 import com.ttibuttibu.chat.coreapi.domain.catalog.entity.ProviderCatalog;
-import com.ttibuttibu.chat.coreapi.domain.catalog.repository.ProviderCatalogRepository;
+import com.ttibuttibu.chat.coreapi.domain.catalog.repository.ModelCatalogRepository;
 import com.ttibuttibu.chat.coreapi.domain.chat.dto.CachedPageDto;
 import com.ttibuttibu.chat.coreapi.domain.chat.dto.ChatRequestDto;
 import com.ttibuttibu.chat.coreapi.domain.chat.dto.ChatResponseDto;
@@ -51,7 +52,7 @@ public class ChatServiceImpl implements ChatService {
     private final RoomRepository roomRepository;
     private final MemberRepository memberRepository;
     private final KeyRepository keyRepository;
-    private final ProviderCatalogRepository providerCatalogRepository;
+    private final ModelCatalogRepository modelCatalogRepository;
     private final SseEmitterManager sseEmitterManager;
     private final LiteLlmWebClient liteLlmWebClient;
     private final LlmStreamParser llmStreamParser;
@@ -132,9 +133,14 @@ public class ChatServiceImpl implements ChatService {
     @Async("aiTaskExecutor")
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     @Override
-    public void processChatAsync(Long chatId, Long branchId, String apiKey, String model, String provider, boolean useLlm, String contextPrompt) {
+    public void processChatAsync(Long chatId, Long branchId, String apiKey, String model, String contextPrompt) {
         Chat chat = chatRepository.findById(chatId)
                 .orElseThrow(() -> new ApiException(ErrorCode.CHAT_NOT_FOUND));
+        ModelCatalog selectedModel = modelCatalogRepository.findByCode(model)
+                .orElseThrow(() -> new ApiException(ErrorCode.MODEL_NOT_FOUND));
+        ProviderCatalog provider = selectedModel.getProvider();
+        String liteLlmModel = provider.getCode() + "/" + selectedModel.getCode();
+
         Long roomId = chat.getRoom().getRoomUid();
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new ApiException(ErrorCode.ROOM_NOT_FOUND));
@@ -145,8 +151,8 @@ public class ChatServiceImpl implements ChatService {
             log.debug("[ASYNC] contextPrompt 길이 초과 → 뒤에서 2000자만 사용");
         }
 
-        log.info("[ASYNC] Chat {} -> 비동기 AI 처리 시작 (model={}, provider={}, useLlm={}, ctxLen={})",
-                chatId, model, provider, useLlm, safeContext == null ? 0 : safeContext.length());
+        log.info("[ASYNC] Chat {} -> 비동기 AI 처리 시작 (model={}, provider={}, ctxLen={})",
+                chatId, liteLlmModel, provider.getCode(), safeContext == null ? 0 : safeContext.length());
 
         // 1. 답변 생성
         // message 구성: LLM API 규격에 맞춰 user 질문으로 변환
@@ -180,18 +186,18 @@ public class ChatServiceImpl implements ChatService {
                 final boolean[] doneEmitted = {false};
 
                 // Flux<String> 스트림 수신
-                Flux<String> stream = liteLlmWebClient.createChatStream(apiKey, model, provider, messages, useLlm);
+                Flux<String> stream = liteLlmWebClient.createChatStream(apiKey, liteLlmModel, messages);
 
                 // 스트림 구독: 청크 단위로 처리
                 stream
                         .doOnNext(chunk -> {
                             try {
-                                JsonNode usageNode = llmStreamParser.extractUsage(provider, chunk);
+                                JsonNode usageNode = llmStreamParser.extractUsage(chunk);
                                 if (usageNode != null) {
                                     usageRef.set(usageNode);
                                 }
 
-                                String delta = llmStreamParser.extractDeltaContent(provider, chunk);
+                                String delta = llmStreamParser.extractDeltaContent(chunk);
                                 if (delta != null && !delta.isBlank()) {
                                     accumulatedAnswer.append(delta);
 
@@ -206,7 +212,7 @@ public class ChatServiceImpl implements ChatService {
                                 }
 
                                 // [DONE] 감지 시 DB 업데이트 + SSE 완료 이벤트 전송
-                                if (!doneEmitted[0] && llmStreamParser.isDoneChunk(provider, chunk)) {
+                                if (!doneEmitted[0] && llmStreamParser.isDoneChunk(chunk)) {
                                     doneEmitted[0] = true;
 
                                     chat.updateAnswer(accumulatedAnswer.toString());
@@ -225,8 +231,8 @@ public class ChatServiceImpl implements ChatService {
                                             new ChatSseEvent<>(ChatSseEventType.CHAT_DONE, payload)
                                     );
 
-                                    log.info("[STREAM] Chat {} 스트리밍 종료 (provider={}, model={})",
-                                            chat.getChatUid(), provider, model);
+                                    log.info("[STREAM] Chat {} 스트리밍 종료 (model={})",
+                                            chat.getChatUid(), liteLlmModel);
                                 }
                             } catch (Exception e) {
                                 log.error("[STREAM] 청크 파싱 에러: {}", e.getMessage());
@@ -398,52 +404,32 @@ public class ChatServiceImpl implements ChatService {
         return arr;
     }
 
-    private void applyTokenUsageIfPresent(Room room, String provider, JsonNode usageNode) {
+    private void applyTokenUsageIfPresent(Room room, ProviderCatalog provider, JsonNode usageNode) {
         if (usageNode == null) return;
 
-        // OpenAI / LiteLLM 스타일 (usage.prompt_tokens / completion_tokens)
         int prompt = 0;
         int completion = 0;
         int total = 0;
 
-        // OpenAI 스타일
         if (usageNode.has("prompt_tokens") || usageNode.has("completion_tokens")) {
             prompt = usageNode.path("prompt_tokens").asInt(0);
             completion = usageNode.path("completion_tokens").asInt(0);
             total = prompt + completion;
         }
 
-        // Gemini 스타일 (usageMetadata.*TokenCount)
-        if (usageNode.has("promptTokenCount") || usageNode.has("candidatesTokenCount")) {
-            int gPrompt = usageNode.path("promptTokenCount").asInt(0);
-            int gCompletion = usageNode.path("candidatesTokenCount").asInt(0);
-            int gTotal = usageNode.path("totalTokenCount").asInt(gPrompt + gCompletion);
-
-            // 둘 중 더 신뢰 가는 값으로 덮어쓰기 (OpenAI가 아닌 경우 대부분 여기로 들어옴)
-            if (gTotal > 0) {
-                prompt = gPrompt;
-                completion = gCompletion;
-                total = gTotal;
-            }
-        }
-
         if (total <= 0) {
-            log.debug("[USAGE] provider={}, totalTokens=0 → 누적 건너뜀", provider);
+            log.debug("[USAGE] provider={}, totalTokens=0 → 누적 건너뜀", provider.getCode());
             return;
         }
 
-        ProviderCatalog providerCatalog = providerCatalogRepository
-                .findByCode(provider)
-                .orElseThrow(() -> new ApiException(ErrorCode.PROVIDER_NOT_FOUND));
-
-        Key key = keyRepository.findByMemberAndProvider(room.getOwner(), providerCatalog)
+        Key key = keyRepository.findByMemberAndProvider(room.getOwner(), provider)
                 .orElseThrow(() -> new ApiException(ErrorCode.KEY_NOT_FOUND));
 
         key.updateTokenUsage(total);
         keyRepository.save(key);
 
         log.info("[USAGE] member={}, provider={}, +{} tokens (prompt={}, completion={})",
-                room.getOwner().getMemberUid(), provider, total, prompt, completion);
+                room.getOwner().getMemberUid(), provider.getCode(), total, prompt, completion);
     }
 
     private String chatKey(Long memberUid, List<String> keywords, Pageable pageable) {

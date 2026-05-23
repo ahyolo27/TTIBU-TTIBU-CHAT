@@ -20,7 +20,7 @@ public class AsyncChatProcessor {
      * 채팅 비동기 처리 (트랜잭션 종료 이후 실행)
      */
     @Async("aiTaskExecutor")
-    public void processAsync(Long chatId, RoomCreateRequestDto request, String decryptedKey, String providerCode, String contextPrompt) {
+    public void processAsync(Long chatId, RoomCreateRequestDto request, String decryptedKey, String contextPrompt) {
         if (chatId == null) {
             log.error("[ASYNC] chatId 가 null 입니다.");
             return;
@@ -30,11 +30,9 @@ public class AsyncChatProcessor {
             return;
         }
 
-        log.info("[ASYNC] processAsync 호출: chatId={}, model={}, provider={}, useLlm={}, ctxLen={}",
+        log.info("[ASYNC] processAsync 호출: chatId={}, model={}, ctxLen={}",
                 chatId,
                 request.getModel(),
-                providerCode,
-                request.isUseLlm(),
                 (contextPrompt == null ? 0 : contextPrompt.length()));
 
         try {
@@ -43,8 +41,6 @@ public class AsyncChatProcessor {
                             request.getBranchId(),
                             decryptedKey,
                             request.getModel(),
-                            providerCode,
-                            request.isUseLlm(),
                             contextPrompt
                     ),
                     Duration.ofSeconds(1)

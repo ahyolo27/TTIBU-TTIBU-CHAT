@@ -17,5 +17,4 @@ public class ChatCreateRequestDto {
 
     private String model; // modelCode
 
-    private boolean useLlm;
 }

@@ -40,7 +40,6 @@ services:
     container_name: ttibu-core-api
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      GMS_BASE_URL: ${GMS_BASE_URL}
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
       LITELLM_BASE_URL: ${LITELLM_BASE_URL}
       LITELLM_MODEL: ${LITELLM_MODEL}

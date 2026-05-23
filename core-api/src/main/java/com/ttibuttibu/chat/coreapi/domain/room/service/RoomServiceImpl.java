@@ -152,8 +152,6 @@ public class RoomServiceImpl implements RoomService {
                 .filter(s -> !s.isBlank())
                 .collect(Collectors.joining("\n\n"));
 
-        String providerCode = provider.getCode();
-
         List<Map<String, Object>> nodePayloads = createdChats.stream().map(chat -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("chat_id", chat.getChatUid());
@@ -189,7 +187,6 @@ public class RoomServiceImpl implements RoomService {
                             newChat.getChatUid(),
                             request,
                             decryptedKey,
-                            providerCode,
                             contextPrompt
                     );
                 } catch (Exception e) {
@@ -369,8 +366,6 @@ public class RoomServiceImpl implements RoomService {
         payload.put("children", List.of());
         payload.put("created_at", newChat.getCreatedAt());
 
-        String providerCode = provider.getCode();
-
         String tempPrompt = "";
         if (request.getParents() != null && !request.getParents().isEmpty()) {
             List<Chat> parentChats = chatRepository.findAllById(request.getParents());
@@ -381,7 +376,7 @@ public class RoomServiceImpl implements RoomService {
         }
         final String contextPrompt = tempPrompt;
 
-        // 트랜잭션 종료 후 비동기 LLM/GMS 처리 시작
+        // 트랜잭션 종료 후 비동기 LLM 처리 시작
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
@@ -394,7 +389,6 @@ public class RoomServiceImpl implements RoomService {
                         newChat.getChatUid(),
                         buildRoomRequest(request),
                         decryptedKey,
-                        providerCode,
                         contextPrompt
                 );
             }
@@ -414,7 +408,6 @@ public class RoomServiceImpl implements RoomService {
         dto.setQuestion(request.getQuestion());
         dto.setBranchId(request.getBranchId());
         dto.setModel(request.getModel());
-        dto.setUseLlm(request.isUseLlm());
         return dto;
     }
 

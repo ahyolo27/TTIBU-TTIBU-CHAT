@@ -30,9 +30,6 @@ litellm:
   api-key: ${LITELLM_MASTER_KEY}
   model: ${LITELLM_MODEL:gpt-3.5-turbo}
 
-gms:
-  base-url: ${GMS_BASE_URL}
-
 ttibu:
   crypto:
     secret: ${TTIBU_CRYPTO_SECRET}

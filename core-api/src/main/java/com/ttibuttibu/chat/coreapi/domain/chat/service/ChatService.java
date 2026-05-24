@@ -13,5 +13,5 @@ public interface ChatService {
 
     ChatResponseDto.CopiedChatInfo copyChat(ChatRequestDto.CopyChat request, Long memberUid);
 
-    void processChatAsync(Long chatId, Long branchId, String apiKey, String model, String contextPrompt);
+    void processChatAsync(Long chatId, Long branchId, String apiKey, String contextPrompt);
 }

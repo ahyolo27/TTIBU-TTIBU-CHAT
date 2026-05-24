@@ -9,7 +9,6 @@ import com.ttibuttibu.chat.coreapi.common.sse.SseEmitterManager;
 import com.ttibuttibu.chat.coreapi.config.properties.AiProcessingProperties;
 import com.ttibuttibu.chat.coreapi.domain.catalog.entity.ModelCatalog;
 import com.ttibuttibu.chat.coreapi.domain.catalog.entity.ProviderCatalog;
-import com.ttibuttibu.chat.coreapi.domain.catalog.repository.ModelCatalogRepository;
 import com.ttibuttibu.chat.coreapi.domain.chat.dto.CachedPageDto;
 import com.ttibuttibu.chat.coreapi.domain.chat.dto.ChatRequestDto;
 import com.ttibuttibu.chat.coreapi.domain.chat.dto.ChatResponseDto;
@@ -52,7 +51,6 @@ public class ChatServiceImpl implements ChatService {
     private final RoomRepository roomRepository;
     private final MemberRepository memberRepository;
     private final KeyRepository keyRepository;
-    private final ModelCatalogRepository modelCatalogRepository;
     private final SseEmitterManager sseEmitterManager;
     private final LiteLlmWebClient liteLlmWebClient;
     private final LlmStreamParser llmStreamParser;
@@ -133,11 +131,12 @@ public class ChatServiceImpl implements ChatService {
     @Async("aiTaskExecutor")
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     @Override
-    public void processChatAsync(Long chatId, Long branchId, String apiKey, String model, String contextPrompt) {
+    public void processChatAsync(Long chatId, Long branchId, String apiKey, String contextPrompt) {
         Chat chat = chatRepository.findById(chatId)
                 .orElseThrow(() -> new ApiException(ErrorCode.CHAT_NOT_FOUND));
-        ModelCatalog selectedModel = modelCatalogRepository.findByCode(model)
-                .orElseThrow(() -> new ApiException(ErrorCode.MODEL_NOT_FOUND));
+
+        ModelCatalog selectedModel = chat.getModelCatalog();
+
         ProviderCatalog provider = selectedModel.getProvider();
         String liteLlmModel = provider.getCode() + "/" + selectedModel.getCode();
 
@@ -152,7 +151,7 @@ public class ChatServiceImpl implements ChatService {
         }
 
         log.info("[ASYNC] Chat {} -> 비동기 AI 처리 시작 (model={}, provider={}, ctxLen={})",
-                chatId, liteLlmModel, provider.getCode(), safeContext == null ? 0 : safeContext.length());
+                chatId, selectedModel.getCode(), provider.getCode(), safeContext == null ? 0 : safeContext.length());
 
         // 1. 답변 생성
         // message 구성: LLM API 규격에 맞춰 user 질문으로 변환

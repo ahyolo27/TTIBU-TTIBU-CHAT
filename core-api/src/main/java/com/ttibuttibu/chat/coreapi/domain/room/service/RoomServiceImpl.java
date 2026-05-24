@@ -77,7 +77,7 @@ public class RoomServiceImpl implements RoomService {
 
         List<Chat> createdChats = new ArrayList<>();
 
-        ModelCatalog modelCatalog = modelCatalogRepository.findByCode(request.getModel())
+        ModelCatalog modelCatalog = modelCatalogRepository.findModelCatalogByModelUidAndIsActiveTrue(request.getModelUid())
                 .orElseThrow(() -> new ApiException(ErrorCode.MODEL_NOT_FOUND));
 
         ProviderCatalog provider = modelCatalog.getProvider();
@@ -88,7 +88,7 @@ public class RoomServiceImpl implements RoomService {
         String decryptedKey = keyService.decrypt(key.getEncryptedKey());
 
         log.info("[ROOM_CREATE] memberId={}, model={}, provider={}, decryptedKey={}",
-                memberId, request.getModel(), provider.getCode(), decryptedKey.substring(0, 6) + "****");
+                memberId, modelCatalog.getCode(), provider.getCode(), decryptedKey.substring(0, 6) + "****");
 
         List<String> contextParts = new ArrayList<>();
 
@@ -185,7 +185,7 @@ public class RoomServiceImpl implements RoomService {
                 try {
                     asyncChatProcessor.processAsync(
                             newChat.getChatUid(),
-                            request,
+                            request.getBranchId(),
                             decryptedKey,
                             contextPrompt
                     );
@@ -341,7 +341,7 @@ public class RoomServiceImpl implements RoomService {
         isOwner(memberId, roomId);
 
         // Model 정보 조회
-        ModelCatalog modelCatalog = modelCatalogRepository.findByCode(request.getModel())
+        ModelCatalog modelCatalog = modelCatalogRepository.findModelCatalogByModelUidAndIsActiveTrue(request.getModelUid())
                 .orElseThrow(() -> new ApiException(ErrorCode.MODEL_NOT_FOUND));
         ProviderCatalog provider = modelCatalog.getProvider();
 
@@ -387,7 +387,7 @@ public class RoomServiceImpl implements RoomService {
 
                 asyncChatProcessor.processAsync(
                         newChat.getChatUid(),
-                        buildRoomRequest(request),
+                        request.getBranchId(),
                         decryptedKey,
                         contextPrompt
                 );
@@ -401,14 +401,6 @@ public class RoomServiceImpl implements RoomService {
                 .branchId(request.getBranchId())
                 .createdAt(newChat.getCreatedAt())
                 .build();
-    }
-
-    private RoomCreateRequestDto buildRoomRequest(ChatCreateRequestDto request) {
-        RoomCreateRequestDto dto = new RoomCreateRequestDto();
-        dto.setQuestion(request.getQuestion());
-        dto.setBranchId(request.getBranchId());
-        dto.setModel(request.getModel());
-        return dto;
     }
 
     private void sendRoomCreatedEvent(Room room, List<Map<String, Object>> nodePayloads, Long branchId) {

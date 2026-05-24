@@ -19,5 +19,5 @@ public class RoomCreateRequestDto {
 
     private Long branchId;
 
-    private String model; // modelCode
+    private Long modelUid;
 }

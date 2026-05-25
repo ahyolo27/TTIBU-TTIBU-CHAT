@@ -20,4 +20,4 @@ COPY --from=builder /usr/lib/postgresql/15/lib/pg_bigm.so /usr/lib/postgresql/15
 
 # PostgreSQL 시작 시 자동으로 pg_bigm 확장 활성화
 RUN mkdir -p /docker-entrypoint-initdb.d \
- && printf 'CREATE EXTENSION IF NOT EXISTS pg_bigm;\n' > /docker-entrypoint-initdb.d/001_pg_bigm.sql
+ && printf 'CREATE EXTENSION IF NOT EXISTS pg_bigm;\nCREATE DATABASE litellm_db;\n' > /docker-entrypoint-initdb.d/001_pg_bigm.sql

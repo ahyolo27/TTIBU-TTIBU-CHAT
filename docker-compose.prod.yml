@@ -44,13 +44,14 @@ services:
 
   # LiteLLM Proxy
   litellm:
-    image: ghcr.io/berriai/litellm:main-latest
+    image: ghcr.io/berriai/litellm-database:main-latest
     container_name: ttibu-litellm
     ports:
       - "4000:4000"
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
       - LITELLM_LOG=INFO
+      - DATABASE_URL=${LITELLM_DATABASE_URL}
     volumes:
       - /home/ubuntu/litellm-config.yaml:/app/config.yaml:ro
     command: --config /app/config.yaml --port 4000

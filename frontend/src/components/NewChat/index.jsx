@@ -18,14 +18,14 @@ export default function NewChat() {
 
   // ✅ 서버 모델 옵션 (항상 기본값이 내려오도록 훅에서 보장하지만, 여기서도 방어)
   const {
-    dropdownItems = [], // [{ label: modelName, value: modelCode, uid, isDefault }]
-    defaultModelCode = "", // 기본 modelCode
+    dropdownItems = [], // [{ label: modelName, value: modelUid, modelCode, isDefault }]
+    defaultModelUid = null, // default modelUid
     modelsLoading = false,
     modelsError = null,
   } = useModels() ?? {};
 
-  // 내부 선택 값은 항상 modelCode 로 보관
-  const [selectedModel, setSelectedModel] = useState("");
+  // 내부 선택 값은 modelUid로 보관
+  const [selectedModelUid, setSelectedModelUid] = useState(null);
 
   // 드롭다운 열림
 
@@ -70,7 +70,7 @@ export default function NewChat() {
       if (!rid) return;
       if (navigatedRef.current === String(rid)) return;
       navigatedRef.current = String(rid);
-      data.model = selectedModel; // 선택된 모델 코드 추가
+      data.modelUid = selectedModelUid;
       console.log("Room created data:", data);
       setRedirecting(true);
 
@@ -78,8 +78,8 @@ export default function NewChat() {
         to: "/chatrooms/$roomId",
         params: { roomId: String(rid) },
         state: {
-          roomInit: { ...data, model: selectedModel },
-          modelCode: selectedModel, // 🔥 명시적으로 전달
+          roomInit: { ...data, modelUid: selectedModelUid },
+          modelUid: selectedModelUid,
         },
         replace: true,
       });
@@ -130,12 +130,12 @@ export default function NewChat() {
 
   // ✅ 기본 선택: 서버 기본값 → 없으면 첫번째 항목
   useEffect(() => {
-    if (!selectedModel) {
-      const fallback = dropdownItems[0]?.value ?? "";
-      const nextCode = defaultModelCode || fallback;
-      if (nextCode) setSelectedModel(nextCode);
+    if (!selectedModelUid) {
+      const fallback = dropdownItems[0]?.value ?? null;
+      const nextUid = defaultModelUid || fallback;
+      if (nextUid) setSelectedModelUid(nextUid);
     }
-  }, [defaultModelCode, dropdownItems, selectedModel]);
+  }, [defaultModelUid, dropdownItems, selectedModelUid]);
 
   const stop = (e) => e.stopPropagation();
 
@@ -159,8 +159,6 @@ export default function NewChat() {
     navigatedRef.current = null;
 
     const branchId = 100; // TODO: 실제 값
-    const useLlm = false;
-
     const nodes = selectedItems.length
       ? selectedItems.map((it, idx) => ({
           type: (it.type || "").toUpperCase() === "GROUP" ? "GROUP" : "CHAT",
@@ -169,10 +167,9 @@ export default function NewChat() {
         }))
       : undefined;
 
-    // ✅ model 에 modelCode 전송
     const payload = nodes
-      ? { nodes, question, branchId, model: selectedModel, useLlm }
-      : { question, branchId, model: selectedModel, useLlm };
+      ? { nodes, question, branchId, modelUid: selectedModelUid }
+      : { question, branchId, modelUid: selectedModelUid };
 
     console.log("[POST /rooms] payload:", payload);
     const rid = await start(payload);
@@ -210,7 +207,7 @@ export default function NewChat() {
 
   // ✅ 선택된 라벨 계산 (방어)
   const selectedLabel = (() => {
-    const item = (dropdownItems || []).find((i) => i.value === selectedModel);
+    const item = (dropdownItems || []).find((i) => i.value === selectedModelUid);
     if (item) return item.label;
     if (modelsLoading) return "모델 불러오는 중…";
     if (modelsError) return "모델 로드 실패";
@@ -249,14 +246,14 @@ export default function NewChat() {
                 (dropdownItems || []).map((it) => (
                   <S.DropdownItem
                     key={it.value}
-                    $active={selectedModel === it.value}
+                    $active={selectedModelUid === it.value}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSelectedModel(it.value); // modelCode
+                      setSelectedModelUid(it.value);
                       setModelOpen(false);
                     }}
                   >
-                    {it.label} {selectedModel === it.value && <span>✔</span>}
+                    {it.label} {selectedModelUid === it.value && <span>✔</span>}
                   </S.DropdownItem>
                 ))}
             </S.DropdownList>

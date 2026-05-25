@@ -56,8 +56,7 @@ export const chatService = {
    *      parents: number[],
    *      branch_id: number,
    *      branch_name?: string,
-   *      model: string,
-   *      useLlm: boolean
+   *      modelUid: number
    *    }
    *  Response: { room_id, node_id, branch_id, created_at }
    *  (LLM 답변/요약/키워드는 SSE 이벤트로 전달)

@@ -27,7 +27,7 @@ export default function ModalShell({
   onPick,
 
   // ✅ 모델 제어용
-  modelCode,
+  modelUid,
   onModelChange,
   modelSource = "available",
 
@@ -51,30 +51,33 @@ export default function ModalShell({
   // ✅ 브랜치 드롭다운 open 상태만 내부에서 관리
   const [branchOpen, setBranchOpen] = useState(false);
 
-  // ✅ 서버 모델 불러오기 (라벨=modelName / 값=modelCode)
+  // 서버 모델 불러오기 (라벨=modelName / 값=modelUid)
   const {
-    dropdownItems = [], // [{ label, value(modelCode), uid, isDefault }]
-    defaultModelCode = "",
+    dropdownItems = [], // [{ label, value(modelUid), modelCode, isDefault }]
+    defaultModelUid = null,
     modelsLoading = false,
     modelsError = null,
   } = useModels({ source: modelSource }) ?? {};
 
-  // ✅ 내부/외부 겸용 선택 상태 (외부에서 modelCode 주면 그걸 우선)
-  const [innerModelCode, setInnerModelCode] = useState("");
+  // 내부/외부 겸용 선택 상태 (외부에서 modelUid를 주면 그 값을 우선)
+  const [innerModelUid, setInnerModelUid] = useState(null);
 
   useEffect(() => {
-    if (modelCode && modelCode !== innerModelCode) {
-      setInnerModelCode(modelCode);
+    if (modelUid && modelUid !== innerModelUid) {
+      setInnerModelUid(modelUid);
     }
-  }, [modelCode, innerModelCode]);
+  }, [modelUid, innerModelUid]);
 
   useEffect(() => {
-    if (!innerModelCode && !modelCode) {
-      const fallback = dropdownItems[0]?.value ?? "";
-      const next = defaultModelCode || fallback;
-      if (next) setInnerModelCode(next);
+    if (!innerModelUid && !modelUid) {
+      const fallback = dropdownItems[0]?.value ?? null;
+      const next = defaultModelUid || fallback;
+      if (next) {
+        setInnerModelUid(next);
+        onModelChange?.(next);
+      }
     }
-  }, [defaultModelCode, dropdownItems, innerModelCode, modelCode]);
+  }, [defaultModelUid, dropdownItems, innerModelUid, modelUid, onModelChange]);
 
   // ✅ 모델 드롭다운 열림 상태
   const [modelOpen, setModelOpen] = useState(false);
@@ -143,8 +146,8 @@ export default function ModalShell({
 
   // ✅ 모델 드롭다운 라벨 계산
   const selectedModelLabel = (() => {
-    const code = modelCode || innerModelCode || "";
-    const found = (dropdownItems || []).find((i) => i.value === code);
+    const selectedUid = modelUid || innerModelUid || null;
+    const found = (dropdownItems || []).find((i) => i.value === selectedUid);
     if (found) return found.label;
     if (modelsLoading) return "모델 불러오는 중…";
     if (modelsError) return "모델 로드 실패";
@@ -152,10 +155,10 @@ export default function ModalShell({
   })();
 
   // ✅ 모델 선택 핸들러
-  const pickModel = (code) => {
-    if (!code) return;
-    onModelChange?.(code);
-    setInnerModelCode(code);
+  const pickModel = (uid) => {
+    if (!uid) return;
+    onModelChange?.(uid);
+    setInnerModelUid(uid);
     setModelOpen(false);
   };
 
@@ -254,14 +257,14 @@ export default function ModalShell({
                     (dropdownItems || []).map((m) => (
                       <S.DropdownItem
                         key={m.value}
-                        $active={(modelCode || innerModelCode) === m.value}
+                        $active={(modelUid || innerModelUid) === m.value}
                         onClick={(e) => {
                           e.stopPropagation();
                           pickModel(m.value);
                         }}
                       >
                         {m.label}{" "}
-                        {(modelCode || innerModelCode) === m.value && (
+                        {(modelUid || innerModelUid) === m.value && (
                           <span>✔</span>
                         )}
                       </S.DropdownItem>

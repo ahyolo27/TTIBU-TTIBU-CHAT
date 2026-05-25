@@ -56,7 +56,7 @@ export function useAttachChatFromExisting() {
 }
 
 /** ✅ 새 채팅 생성: POST /rooms/{roomId}/chats
- *  vars: { roomId, question, parents, branch_id, branch_name?, model, useLlm }
+ *  vars: { roomId, question, parents, branch_id, branch_name?, modelUid }
  */
 export function useCreateChat() {
   const qc = useQueryClient();

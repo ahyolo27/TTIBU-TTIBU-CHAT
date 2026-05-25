@@ -25,20 +25,20 @@ export const useModels = ({ source = 'available' } = {}) => {
       .flatMap((p) => p?.models || [])
       .map((m) => ({
         label: m?.modelName,
-        value: m?.modelCode,
-        uid: m?.modelUid,
+        value: m?.modelUid,
+        modelCode: m?.modelCode,
         isDefault: !!m?.isDefault,
       }));
   }, [providers]);
 
-  const defaultModelCode =
+  const defaultModelUid =
     (dropdownItems.find((m) => m.isDefault) || {}).value ||
     (dropdownItems[0] || {}).value ||
-    "";
+    null;
 
   return {
     dropdownItems,
-    defaultModelCode,
+    defaultModelUid,
     modelsLoading: loading,
     modelsError: error,
   };

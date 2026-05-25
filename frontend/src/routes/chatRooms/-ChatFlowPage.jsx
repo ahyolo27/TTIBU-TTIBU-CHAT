@@ -109,8 +109,8 @@ export default function ChatFlowPage() {
   const locationState = routeState?.location?.state ?? {};
   const roomInit = locationState.roomInit;
   const apiRoomData = fetchedRoom?.data ?? fetchedRoom ?? null;
-  const initialModelCode =
-    locationState.modelCode ?? roomInit?.model ?? apiRoomData?.model ?? "";
+  const initialModelUid =
+    locationState.modelUid ?? roomInit?.modelUid ?? apiRoomData?.modelUid ?? null;
   const routeMode = locationState.mode ?? "existing-room";
   const [ignoreRoomInit, setIgnoreRoomInit] = useState(false);
   const startBranchKeyFromRoute = locationState.startBranchKey ?? "전체";
@@ -162,7 +162,7 @@ export default function ChatFlowPage() {
 
   const createGroup = useCreateGroup();
 
-  const [modelCode, setModelCode] = useState(initialModelCode);
+  const [modelUid, setModelUid] = useState(initialModelUid);
   /* ✅ 서버 최신 데이터 */
 
   const createChat = useCreateChat();
@@ -2394,7 +2394,7 @@ export default function ChatFlowPage() {
       t,
       parentChatIds,
       branchId,
-      modelCode,
+      modelUid,
       branchName // ★ 디버그용 로그
     );
 
@@ -2405,8 +2405,7 @@ export default function ChatFlowPage() {
       parents: parentChatIds,
       branch_id: branchId, // ✅ 계산된 branch_id
       branch_name: branchName || null,
-      model: modelCode || "gpt-4o-mini",
-      useLlm: false,
+      modelUid,
       "🔹 branch_id 타입": typeof branchId,
       "🔹 branch_id 값": branchId,
     });
@@ -2420,8 +2419,7 @@ export default function ChatFlowPage() {
           parents: parentChatIds,
           branch_id: branchId,
           branch_name: branchName || null, // ★ 서버로 브랜치명 함께 전송
-          model: modelCode || "gpt-4o-mini",
-          useLlm: false,
+          modelUid,
         },
         {
           onSuccess: (res, vars) => {
@@ -2495,7 +2493,7 @@ export default function ChatFlowPage() {
     createChat,
     connected,
     connectRoomSSE,
-    modelCode,
+    modelUid,
     focusedChatId,
     activeBranchKey,
     branchViews,
@@ -3247,8 +3245,8 @@ export default function ChatFlowPage() {
         onBranchSelect={handleBranchSelect}
         // 🔥 어떤 노드를 가운데로 스크롤할지
         focusChatId={focusedChatId}
-        modelCode={modelCode}
-        onModelChange={setModelCode}
+        modelUid={modelUid}
+        onModelChange={setModelUid}
         modelSource="available"
       />
 

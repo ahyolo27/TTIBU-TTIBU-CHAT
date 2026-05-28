@@ -60,7 +60,10 @@ export default function NewChat() {
     if (navigatedRef.current === id) return;
     navigatedRef.current = id;
 
-    navigate({ to: `/chatrooms/${id}` });
+    navigate({
+      to: "/chatRooms/$nodeId",
+      params: { nodeId: String(id) },
+    });
   };
 
   const { start, roomId, submitting, connected, lastMessage } = useStartChat({
@@ -75,8 +78,8 @@ export default function NewChat() {
       setRedirecting(true);
 
       navigate({
-        to: "/chatrooms/$roomId",
-        params: { roomId: String(rid) },
+        to: "/chatRooms/$nodeId",
+        params: { nodeId: String(rid) },
         state: {
           roomInit: { ...data, modelUid: selectedModelUid },
           modelUid: selectedModelUid,
@@ -91,7 +94,10 @@ export default function NewChat() {
       if (!id) return;
       if (navigatedRef.current === id) return;
       navigatedRef.current = id;
-      navigate({ to: `/chatrooms/${id}` });
+      navigate({
+        to: "/chatRooms/$nodeId",
+        params: { nodeId: String(id) },
+      });
     },
     onRoomShortSummary: (d) => {
       console.log("[ROOM_SHORT_SUMMARY]", d);

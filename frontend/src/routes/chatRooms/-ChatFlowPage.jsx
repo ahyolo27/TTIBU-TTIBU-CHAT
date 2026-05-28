@@ -2417,8 +2417,8 @@ export default function ChatFlowPage() {
           roomId: Number(roomId),
           question: t,
           parents: parentChatIds,
-          branch_id: branchId,
-          branch_name: branchName || null, // ★ 서버로 브랜치명 함께 전송
+          branchId,
+          branchName: branchName || null,
           modelUid,
         },
         {
@@ -2815,6 +2815,7 @@ export default function ChatFlowPage() {
 
           delete streamRef.current[String(chatId)];
           setStreamTick((v) => v + 1);
+          setIgnoreRoomInit(true);
 
           setChatViews((prev) => {
             const { next } = updateNodeByChatId(prev, chatId, (node) => ({
@@ -2825,6 +2826,7 @@ export default function ChatFlowPage() {
             }));
 
             const enriched = attachParentChildren(next);
+            chatViewsRef.current = enriched;
             persistViews(enriched);
             return enriched;
           });
@@ -2869,6 +2871,7 @@ export default function ChatFlowPage() {
 
             const enriched = attachParentChildren(next);
             console.log("[CHAT_SUMMARY_KEYWORDS] enriched", enriched);
+            chatViewsRef.current = enriched;
             persistViews(enriched);
             return enriched;
           });

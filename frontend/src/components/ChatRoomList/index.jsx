@@ -64,7 +64,7 @@ export default function ChatRoomList() {
 
   const handleClickChat = (id) =>
     navigate({
-      to: "/chatrooms/$nodeId",
+      to: "/chatRooms/$nodeId",
       params: { nodeId: String(id) },
       state: {
         mode: "existing-room", // or 생략 (기본값)

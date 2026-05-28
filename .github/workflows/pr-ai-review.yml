@@ -73,23 +73,7 @@ jobs:
             : > pr.diff
           fi
 
-          {
-            echo "PR_TITLE<<EOF"
-            echo "${{ steps.pr.outputs.title }}"
-            echo "EOF"
-            echo "CHANGED_FILES<<EOF"
-            cat changed-files.txt
-            echo
-            echo "EOF"
-            echo "REVIEWED_FILES<<EOF"
-            cat review-files.txt
-            echo
-            echo "EOF"
-            echo "PR_DIFF<<EOF"
-            head -c 180000 pr.diff
-            echo
-            echo "EOF"
-          } >> "$GITHUB_ENV"
+          head -c 180000 pr.diff > review-diff.txt
 
       - name: Ask OpenAI for review
         id: openai
@@ -97,11 +81,22 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_REVIEW_MODEL: ${{ vars.OPENAI_REVIEW_MODEL || 'gpt-5.3-codex' }}
+          PR_TITLE: ${{ steps.pr.outputs.title }}
         with:
           script: |
+            const fs = require('fs');
+
             if (!process.env.OPENAI_API_KEY) {
               throw new Error('Missing OPENAI_API_KEY repository secret.');
             }
+
+            const changedFiles = fs.readFileSync('changed-files.txt', 'utf8');
+            const reviewedFiles = fs.existsSync('review-files.txt')
+              ? fs.readFileSync('review-files.txt', 'utf8')
+              : '';
+            const reviewDiff = fs.existsSync('review-diff.txt')
+              ? fs.readFileSync('review-diff.txt', 'utf8')
+              : '';
 
             const prompt = [
               'You are a senior software engineer reviewing a GitHub pull request.',
@@ -115,13 +110,13 @@ jobs:
               `PR title: ${process.env.PR_TITLE}`,
               '',
               'Changed files:',
-              process.env.CHANGED_FILES,
+              changedFiles,
               '',
               'Files included in the review diff:',
-              process.env.REVIEWED_FILES || '(none)',
+              reviewedFiles || '(none)',
               '',
               'Diff:',
-              process.env.PR_DIFF || '(No reviewable diff after excluding lock files and generated outputs.)',
+              reviewDiff || '(No reviewable diff after excluding lock files and generated outputs.)',
             ].join('\n');
 
             const response = await fetch('https://api.openai.com/v1/responses', {
@@ -153,18 +148,19 @@ jobs:
               throw new Error(`OpenAI API returned no review text: ${JSON.stringify(body)}`);
             }
 
-            core.setOutput('review', text);
+            fs.writeFileSync('ai-review.md', text);
 
       - name: Create PR review comment
         uses: actions/github-script@v7
         env:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
-          REVIEW_BODY: ${{ steps.openai.outputs.review }}
           MODEL: ${{ vars.OPENAI_REVIEW_MODEL || 'gpt-5.3-codex' }}
         with:
           script: |
+            const fs = require('fs');
             const marker = '<!-- pr-ai-review -->';
             const issue_number = Number(process.env.PR_NUMBER);
+            const reviewBody = fs.readFileSync('ai-review.md', 'utf8');
             const reviewedAt = new Intl.DateTimeFormat('sv-SE', {
               timeZone: 'Asia/Seoul',
               year: 'numeric',
@@ -177,9 +173,9 @@ jobs:
 
             const body = [
               marker,
-              process.env.REVIEW_BODY,
+              reviewBody,
               '',
-              `<sub>🤖 AI review · ${reviewedAt} KST · ${process.env.MODEL}</sub>`,
+              `<sub>AI review | ${reviewedAt} KST | ${process.env.MODEL}</sub>`,
             ].join('\n');
 
             await github.rest.issues.createComment({

@@ -47,7 +47,7 @@ export default function SidebarMenu() {
 
   const handleChatClick = (chatId) => {
     navigate({
-      to: "/chatrooms/$nodeId",
+      to: "/chatRooms/$nodeId",
       params: { nodeId: String(chatId) },
     });
   };
@@ -136,8 +136,8 @@ export default function SidebarMenu() {
       {/* 채팅 메뉴 */}
       <S.MenuItem
         $collapsed={isCollapsed}
-        $active={currentPath.startsWith("/chatrooms")}
-        onClick={() => handleNavigate("/chatrooms")}
+        $active={currentPath.startsWith("/chatRooms")}
+        onClick={() => handleNavigate("/chatRooms")}
       >
         <div className="icon">
           <ChatRoomIcon />
@@ -173,14 +173,14 @@ export default function SidebarMenu() {
                       <S.SubItem
                         key={chat.id}
                         onClick={() => handleChatClick(chat.id)}
-                        $active={currentPath === `/chatrooms/${chat.id}`}
+                          $active={currentPath === `/chatRooms/${chat.id}`}
                       >
                         {chat.name}
                       </S.SubItem>
                     ))}
                   </S.SubList>
                   {chats.length > 5 && (
-                    <S.MoreButton onClick={() => handleNavigate("/chatrooms")}>
+                    <S.MoreButton onClick={() => handleNavigate("/chatRooms")}>
                       더보기 ({chats.length - 5}+)
                     </S.MoreButton>
                   )}

@@ -54,11 +54,11 @@ export const chatService = {
    *    {
    *      question: string,
    *      parents: number[],
-   *      branch_id: number,
-   *      branch_name?: string,
+   *      branchId: number,
+   *      branchName?: string,
    *      modelUid: number
    *    }
-   *  Response: { room_id, node_id, branch_id, created_at }
+   *  Response: { roomId, nodeId, branchId, createdAt }
    *  (LLM 답변/요약/키워드는 SSE 이벤트로 전달)
    */
   createChat: async ({ roomId, ...payload }) => {

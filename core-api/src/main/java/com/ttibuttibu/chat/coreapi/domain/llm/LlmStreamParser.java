@@ -14,10 +14,8 @@ public class LlmStreamParser {
     /**
      * Chunk에서 content(답변 텍스트) 부분만 추출
      */
-    public String extractDeltaContent(String provider, String chunk) {
+    public String extractDeltaContent(String chunk) {
         if (chunk == null || chunk.isBlank()) return null;
-
-        String p = normalizeProvider(provider);
 
         try {
             String json = normalizeJson(chunk);
@@ -26,8 +24,6 @@ public class LlmStreamParser {
 
             root = unwrapFirstIfArray(root);
 
-            // 1) OpenAI / GPT / LiteLLM
-            if (p.equals("openai") || p.equals("litellm")) {
                 JsonNode choices = root.path("choices");
                 if (choices.isArray() && !choices.isEmpty()) {
                     JsonNode delta = choices.get(0).path("delta");
@@ -35,35 +31,10 @@ public class LlmStreamParser {
                         return delta.get("content").asText();
                     }
                 }
-            }
-
-            // 2) Claude / Anthropic
-            if (p.equals("anthropic") || p.equals("claude")) {
-                if (root.has("type")
-                        && "content_block_delta".equals(root.get("type").asText())) {
-
-                    JsonNode delta = root.path("delta");
-                    if (delta.has("text")) {
-                        return delta.get("text").asText();
-                    }
-                }
-            }
-
-            // 3) Gemini / Google
-            if (p.equals("gemini") || p.equals("google")) {
-                JsonNode parts = root
-                        .path("candidates").path(0)
-                        .path("content").path("parts");
-
-                if (parts.isArray() && !parts.isEmpty()) {
-                    JsonNode t = parts.get(0).path("text");
-                    if (t.isTextual()) return t.asText();
-                }
-            }
 
         } catch (Exception e) {
-            log.warn("[Parser] extractDeltaContent 오류 provider={}, err={}, chunk={}",
-                    provider, e.getMessage(), chunk);
+            log.warn("[Parser] extractDeltaContent 오류 err={}, chunk={}",
+                    e.getMessage(), chunk);
         }
 
         return null;
@@ -72,69 +43,27 @@ public class LlmStreamParser {
     /**
      * Chunk가 [DONE] 종료 신호인지 여부
      */
-    public boolean isDoneChunk(String provider, String chunk) {
+    public boolean isDoneChunk(String chunk) {
         if (chunk == null) return false;
 
-        String p = normalizeProvider(provider);
         String c = chunk.trim();
 
         try {
-
-            // 0) 모든 provider 공통: SSE 센티넬 문자열 "[DONE]" 우선 처리
-            if (c.equals("[DONE]") || c.equalsIgnoreCase("data: [DONE]")) {
+            if (c.equals("[DONE]") || c.equalsIgnoreCase("data: [DONE]"))
                 return true;
-            }
-
-            // 1) OpenAI / GPT / LiteLLM
-            if (p.equals("openai") || p.equals("litellm")) {
-                // 이미 위에서 [DONE] 처리함 → 여기서는 false
-                return false;
-            }
-
-            // 2) Gemini / Google
-            if (p.equals("gemini") || p.equals("google")) {
-                // [수정] Gemini의 NDJSON 조각을 JsonNode로 해석
-                String json = normalizeJson(c);
-                JsonNode root = safeParse(json);
-                if (root == null) return false;
-
-                root = unwrapFirstIfArray(root);
-
-                JsonNode candidates = root.path("candidates");
-                if (candidates.isArray() && !candidates.isEmpty()) {
-
-                    // [수정] Gemini의 finishReason 기반 종료 처리
-                    String reason = candidates.get(0).path("finishReason").asText("");
-                    return reason.equalsIgnoreCase("STOP")
-                            || reason.equalsIgnoreCase("MAX_TOKENS")
-                            || reason.equalsIgnoreCase("SAFETY");
-                }
-
-                return false;
-            }
-
-            // 3) Claude / Anthropic
-            if (p.equals("anthropic") || p.equals("claude")) {
-                // [수정] Anthropic의 message_stop 구조 처리
-                String json = normalizeJson(c);
-                JsonNode root = safeParse(json);
-                if (root == null) return false;
-
-                return "message_stop".equals(root.path("type").asText(""));
-            }
 
         } catch (Exception e) {
-            log.warn("[Parser] isDoneChunk 파싱 오류 provider={}, chunk={}, err={}",
-                    provider, chunk, e.getMessage());
+            log.warn("[Parser] isDoneChunk 파싱 오류 chunk={}, err={}",
+                    chunk, e.getMessage());
         }
 
         return false;
     }
 
     /**
-     * usage 추출 (OpenAI, Gemini 등)
+     * usage 추출
      */
-    public JsonNode extractUsage(String provider, String chunk) {
+    public JsonNode extractUsage(String chunk) {
         if (chunk == null || chunk.isBlank()) return null;
 
         try {
@@ -144,18 +73,11 @@ public class LlmStreamParser {
 
             root = unwrapFirstIfArray(root);
 
-            // 1) OpenAI / LiteLLM
-            if (root.has("usage")) {
+            if (root.has("usage"))
                 return root.get("usage");
-            }
-
-            // [수정] 2) Gemini / Google - usageMetadata 지원
-            if (root.has("usageMetadata")) {
-                return root.get("usageMetadata");
-            }
 
         } catch (Exception e) {
-            log.warn("[Parser] usage 파싱 실패 provider={}", provider);
+            log.warn("[Parser] usage 파싱 실패");
         }
         return null;
     }
@@ -176,11 +98,6 @@ public class LlmStreamParser {
             return root.get(0);
         }
         return root;
-    }
-
-    private String normalizeProvider(String provider) {
-        if (provider == null) return "";
-        return provider.toLowerCase().trim();
     }
 
     private String normalizeJson(String raw) {

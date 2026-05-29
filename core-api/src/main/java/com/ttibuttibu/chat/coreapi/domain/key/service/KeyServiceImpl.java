@@ -64,13 +64,8 @@ public class KeyServiceImpl implements KeyService {
             throw new ApiException(ErrorCode.DUPLICATED_KEY);
 
         // 3. 1토큰 테스트
-        // FIXME: 운영 환경에서 주석 해제
-//        String testModel = provider.getCode() + "/" + models.get(0).code();
-//        liteLlmClient.test(request.key(), testModel); // 문제 있다면 에러 발생
-
-        // FIXME: 운영 환경에서 주석 처리
-        String testModel = models.get(0).code();
-        liteLlmClient.gmsTest(request.key(), testModel, provider.getCode());
+        String testModel = provider.getCode() + "/" + models.get(0).code();
+        liteLlmClient.test(request.key(), testModel); // 문제 있다면 에러 발생
 
         // 4. 키 암호화 후 저장
         Key key = Key.builder()
@@ -108,13 +103,8 @@ public class KeyServiceImpl implements KeyService {
             throw new ApiException(ErrorCode.MODEL_CATALOG_EMPTY);
 
         if (!request.key().equals(decryptKey(key.getEncryptedKey())) || (!key.getIsActive().equals(request.isActive()) && request.isActive())) { // 키가 바뀌거나, 활성화 되는 경우
-            // FIXME: 운영 환경에서 주석 해제
-//        String testModel = provider.getCode() + "/" + models.get(0).code();
-//        liteLlmClient.test(request.key(), testModel); // 문제 있다면 에러 발생
-
-            // FIXME: 운영 환경에서 주석 처리
-            String testModel = models.get(0).code();
-            liteLlmClient.gmsTest(request.key(), testModel, provider.getCode());
+            String testModel = provider.getCode() + "/" + models.get(0).code();
+            liteLlmClient.test(request.key(), testModel); // 문제 있다면 에러 발생
         }
 
         key.update(provider, encryptKey(request.key()), request.isActive(), request.expirationAt());

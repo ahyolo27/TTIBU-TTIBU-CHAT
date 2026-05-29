@@ -1,7 +1,6 @@
 package com.ttibuttibu.chat.coreapi.domain.room.service;
 
 import com.ttibuttibu.chat.coreapi.domain.chat.service.ChatService;
-import com.ttibuttibu.chat.coreapi.domain.room.dto.RoomCreateRequestDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -20,31 +19,26 @@ public class AsyncChatProcessor {
      * 채팅 비동기 처리 (트랜잭션 종료 이후 실행)
      */
     @Async("aiTaskExecutor")
-    public void processAsync(Long chatId, RoomCreateRequestDto request, String decryptedKey, String providerCode, String contextPrompt) {
+    public void processAsync(Long chatId, Long branchId, String decryptedKey, String contextPrompt) {
         if (chatId == null) {
             log.error("[ASYNC] chatId 가 null 입니다.");
             return;
         }
-        if (request == null) {
-            log.error("[ASYNC] request 가 null 입니다.");
+        if (branchId == null) {
+            log.error("[ASYNC] branchId 가 null 입니다.");
             return;
         }
 
-        log.info("[ASYNC] processAsync 호출: chatId={}, model={}, provider={}, useLlm={}, ctxLen={}",
+        log.info("[ASYNC] processAsync 호출: chatId={}, branchId={}, ctxLen={}",
                 chatId,
-                request.getModel(),
-                providerCode,
-                request.isUseLlm(),
+                branchId,
                 (contextPrompt == null ? 0 : contextPrompt.length()));
 
         try {
             runWithRetry(() -> chatService.processChatAsync(
                             chatId,
-                            request.getBranchId(),
+                            branchId,
                             decryptedKey,
-                            request.getModel(),
-                            providerCode,
-                            request.isUseLlm(),
                             contextPrompt
                     ),
                     Duration.ofSeconds(1)

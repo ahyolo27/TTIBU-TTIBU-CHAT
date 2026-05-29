@@ -54,10 +54,6 @@ summary-api:
   base-url: ${SUMMARY_API_BASE_URL:http://localhost:8001}
   timeout-ms: ${SUMMARY_API_TIMEOUT_MS:10000}
 
-# GMS Configuration
-gms:
-  base-url: ${GMS_BASE_URL}
-
 # TTIBU Configuration
 ttibu:
   litellm:

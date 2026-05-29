@@ -15,7 +15,6 @@ public class ChatCreateRequestDto {
 
     private String branchName;
 
-    private String model; // modelCode
+    private Long modelUid;
 
-    private boolean useLlm;
 }

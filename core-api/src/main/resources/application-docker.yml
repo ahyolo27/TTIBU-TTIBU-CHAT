@@ -33,10 +33,6 @@ server:
         secure: true
         same-site: None
 
-# GMS Configuration
-gms:
-  base-url: ${GMS_BASE_URL}
-
 # LiteLLM Configuration
 litellm:
   base-url: http://litellm:4000

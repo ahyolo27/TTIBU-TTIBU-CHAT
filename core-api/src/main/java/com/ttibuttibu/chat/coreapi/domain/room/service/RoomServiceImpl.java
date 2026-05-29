@@ -77,7 +77,7 @@ public class RoomServiceImpl implements RoomService {
 
         List<Chat> createdChats = new ArrayList<>();
 
-        ModelCatalog modelCatalog = modelCatalogRepository.findByCode(request.getModel())
+        ModelCatalog modelCatalog = modelCatalogRepository.findModelCatalogByModelUidAndIsActiveTrue(request.getModelUid())
                 .orElseThrow(() -> new ApiException(ErrorCode.MODEL_NOT_FOUND));
 
         ProviderCatalog provider = modelCatalog.getProvider();
@@ -88,7 +88,7 @@ public class RoomServiceImpl implements RoomService {
         String decryptedKey = keyService.decrypt(key.getEncryptedKey());
 
         log.info("[ROOM_CREATE] memberId={}, model={}, provider={}, decryptedKey={}",
-                memberId, request.getModel(), provider.getCode(), decryptedKey.substring(0, 6) + "****");
+                memberId, modelCatalog.getCode(), provider.getCode(), decryptedKey.substring(0, 6) + "****");
 
         List<String> contextParts = new ArrayList<>();
 
@@ -152,8 +152,6 @@ public class RoomServiceImpl implements RoomService {
                 .filter(s -> !s.isBlank())
                 .collect(Collectors.joining("\n\n"));
 
-        String providerCode = provider.getCode();
-
         List<Map<String, Object>> nodePayloads = createdChats.stream().map(chat -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("chat_id", chat.getChatUid());
@@ -187,9 +185,8 @@ public class RoomServiceImpl implements RoomService {
                 try {
                     asyncChatProcessor.processAsync(
                             newChat.getChatUid(),
-                            request,
+                            request.getBranchId(),
                             decryptedKey,
-                            providerCode,
                             contextPrompt
                     );
                 } catch (Exception e) {
@@ -344,7 +341,7 @@ public class RoomServiceImpl implements RoomService {
         isOwner(memberId, roomId);
 
         // Model 정보 조회
-        ModelCatalog modelCatalog = modelCatalogRepository.findByCode(request.getModel())
+        ModelCatalog modelCatalog = modelCatalogRepository.findModelCatalogByModelUidAndIsActiveTrue(request.getModelUid())
                 .orElseThrow(() -> new ApiException(ErrorCode.MODEL_NOT_FOUND));
         ProviderCatalog provider = modelCatalog.getProvider();
 
@@ -369,8 +366,6 @@ public class RoomServiceImpl implements RoomService {
         payload.put("children", List.of());
         payload.put("created_at", newChat.getCreatedAt());
 
-        String providerCode = provider.getCode();
-
         String tempPrompt = "";
         if (request.getParents() != null && !request.getParents().isEmpty()) {
             List<Chat> parentChats = chatRepository.findAllById(request.getParents());
@@ -381,7 +376,7 @@ public class RoomServiceImpl implements RoomService {
         }
         final String contextPrompt = tempPrompt;
 
-        // 트랜잭션 종료 후 비동기 LLM/GMS 처리 시작
+        // 트랜잭션 종료 후 비동기 LLM 처리 시작
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
@@ -392,9 +387,8 @@ public class RoomServiceImpl implements RoomService {
 
                 asyncChatProcessor.processAsync(
                         newChat.getChatUid(),
-                        buildRoomRequest(request),
+                        request.getBranchId(),
                         decryptedKey,
-                        providerCode,
                         contextPrompt
                 );
             }
@@ -407,15 +401,6 @@ public class RoomServiceImpl implements RoomService {
                 .branchId(request.getBranchId())
                 .createdAt(newChat.getCreatedAt())
                 .build();
-    }
-
-    private RoomCreateRequestDto buildRoomRequest(ChatCreateRequestDto request) {
-        RoomCreateRequestDto dto = new RoomCreateRequestDto();
-        dto.setQuestion(request.getQuestion());
-        dto.setBranchId(request.getBranchId());
-        dto.setModel(request.getModel());
-        dto.setUseLlm(request.isUseLlm());
-        return dto;
     }
 
     private void sendRoomCreatedEvent(Room room, List<Map<String, Object>> nodePayloads, Long branchId) {

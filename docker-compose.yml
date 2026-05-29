@@ -40,7 +40,6 @@ services:
     container_name: ttibu-core-api
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      GMS_BASE_URL: ${GMS_BASE_URL}
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
       LITELLM_BASE_URL: ${LITELLM_BASE_URL}
       LITELLM_MODEL: ${LITELLM_MODEL}
@@ -63,16 +62,19 @@ services:
 
   # LiteLLM Proxy
   litellm:
-    image: ghcr.io/berriai/litellm:main-latest
+    image: ghcr.io/berriai/litellm-database:main-latest
     container_name: ttibu-litellm
     ports:
       - "4000:4000"
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
       - LITELLM_LOG=INFO
+      - DATABASE_URL=${LITELLM_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/litellm_db}
     volumes:
       - ./litellm-config.yaml:/app/config.yaml
     command: --config /app/config.yaml --port 4000
+    depends_on:
+      - postgres
     networks:
       - ttibu-network
 

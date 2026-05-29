@@ -109,8 +109,8 @@ export default function ChatFlowPage() {
   const locationState = routeState?.location?.state ?? {};
   const roomInit = locationState.roomInit;
   const apiRoomData = fetchedRoom?.data ?? fetchedRoom ?? null;
-  const initialModelCode =
-    locationState.modelCode ?? roomInit?.model ?? apiRoomData?.model ?? "";
+  const initialModelUid =
+    locationState.modelUid ?? roomInit?.modelUid ?? apiRoomData?.modelUid ?? null;
   const routeMode = locationState.mode ?? "existing-room";
   const [ignoreRoomInit, setIgnoreRoomInit] = useState(false);
   const startBranchKeyFromRoute = locationState.startBranchKey ?? "전체";
@@ -162,7 +162,7 @@ export default function ChatFlowPage() {
 
   const createGroup = useCreateGroup();
 
-  const [modelCode, setModelCode] = useState(initialModelCode);
+  const [modelUid, setModelUid] = useState(initialModelUid);
   /* ✅ 서버 최신 데이터 */
 
   const createChat = useCreateChat();
@@ -2394,21 +2394,20 @@ export default function ChatFlowPage() {
       t,
       parentChatIds,
       branchId,
-      modelCode,
+      modelUid,
       branchName // ★ 디버그용 로그
     );
 
-    // 🔥 서버 전송 직전 branch_id 확인 로그
+    // 🔥 서버 전송 직전 branchId 확인 로그
     console.log("[handleSend] 🚀 서버로 채팅 생성 API 호출 직전:", {
       roomId: Number(roomId),
       question: t,
       parents: parentChatIds,
-      branch_id: branchId, // ✅ 계산된 branch_id
-      branch_name: branchName || null,
-      model: modelCode || "gpt-4o-mini",
-      useLlm: false,
-      "🔹 branch_id 타입": typeof branchId,
-      "🔹 branch_id 값": branchId,
+      branchId,
+      branchName: branchName || null,
+      modelUid,
+      "🔹 branchId 타입": typeof branchId,
+      "🔹 branchId 값": branchId,
     });
 
     // 7) 백엔드에 새 채팅 생성 요청
@@ -2418,10 +2417,9 @@ export default function ChatFlowPage() {
           roomId: Number(roomId),
           question: t,
           parents: parentChatIds,
-          branch_id: branchId,
-          branch_name: branchName || null, // ★ 서버로 브랜치명 함께 전송
-          model: modelCode || "gpt-4o-mini",
-          useLlm: false,
+          branchId,
+          branchName: branchName || null,
+          modelUid,
         },
         {
           onSuccess: (res, vars) => {
@@ -2433,8 +2431,8 @@ export default function ChatFlowPage() {
             const node_id = res.nodeId;
             const created_at = res.createdAt;
 
-            const branch_id = vars.branch_id ?? res.branchId ?? null;
-            const branch_name_sent = vars.branch_name; // 전송한 branch_name
+            const branch_id = vars.branchId ?? res.branchId ?? null;
+            const branch_name_sent = vars.branchName; // 전송한 branch_name
             const branch_name_received = res.branchName; // 서버에서 받은 branch_name
             const parents = Array.isArray(vars.parents) ? vars.parents : [];
             const question = vars.question;
@@ -2495,7 +2493,7 @@ export default function ChatFlowPage() {
     createChat,
     connected,
     connectRoomSSE,
-    modelCode,
+    modelUid,
     focusedChatId,
     activeBranchKey,
     branchViews,
@@ -2817,6 +2815,7 @@ export default function ChatFlowPage() {
 
           delete streamRef.current[String(chatId)];
           setStreamTick((v) => v + 1);
+          setIgnoreRoomInit(true);
 
           setChatViews((prev) => {
             const { next } = updateNodeByChatId(prev, chatId, (node) => ({
@@ -2827,6 +2826,7 @@ export default function ChatFlowPage() {
             }));
 
             const enriched = attachParentChildren(next);
+            chatViewsRef.current = enriched;
             persistViews(enriched);
             return enriched;
           });
@@ -2871,6 +2871,7 @@ export default function ChatFlowPage() {
 
             const enriched = attachParentChildren(next);
             console.log("[CHAT_SUMMARY_KEYWORDS] enriched", enriched);
+            chatViewsRef.current = enriched;
             persistViews(enriched);
             return enriched;
           });
@@ -3247,8 +3248,8 @@ export default function ChatFlowPage() {
         onBranchSelect={handleBranchSelect}
         // 🔥 어떤 노드를 가운데로 스크롤할지
         focusChatId={focusedChatId}
-        modelCode={modelCode}
-        onModelChange={setModelCode}
+        modelUid={modelUid}
+        onModelChange={setModelUid}
         modelSource="available"
       />
 

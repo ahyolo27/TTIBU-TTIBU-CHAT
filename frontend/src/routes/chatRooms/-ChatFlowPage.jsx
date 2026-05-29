@@ -2398,16 +2398,16 @@ export default function ChatFlowPage() {
       branchName // ★ 디버그용 로그
     );
 
-    // 🔥 서버 전송 직전 branch_id 확인 로그
+    // 🔥 서버 전송 직전 branchId 확인 로그
     console.log("[handleSend] 🚀 서버로 채팅 생성 API 호출 직전:", {
       roomId: Number(roomId),
       question: t,
       parents: parentChatIds,
-      branch_id: branchId, // ✅ 계산된 branch_id
-      branch_name: branchName || null,
+      branchId,
+      branchName: branchName || null,
       modelUid,
-      "🔹 branch_id 타입": typeof branchId,
-      "🔹 branch_id 값": branchId,
+      "🔹 branchId 타입": typeof branchId,
+      "🔹 branchId 값": branchId,
     });
 
     // 7) 백엔드에 새 채팅 생성 요청
@@ -2431,8 +2431,8 @@ export default function ChatFlowPage() {
             const node_id = res.nodeId;
             const created_at = res.createdAt;
 
-            const branch_id = vars.branch_id ?? res.branchId ?? null;
-            const branch_name_sent = vars.branch_name; // 전송한 branch_name
+            const branch_id = vars.branchId ?? res.branchId ?? null;
+            const branch_name_sent = vars.branchName; // 전송한 branch_name
             const branch_name_received = res.branchName; // 서버에서 받은 branch_name
             const parents = Array.isArray(vars.parents) ? vars.parents : [];
             const question = vars.question;

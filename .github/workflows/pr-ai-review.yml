@@ -135,8 +135,11 @@ jobs:
             cat changed-since-previous.txt previous-pending-files.txt 2>/dev/null |
               awk 'NF && !seen[$0]++ { print }' |
               awk 'NR==FNR { valid[$0]=1; next } valid[$0]' review-files.txt - > candidate-files.txt
+
+            awk 'NR==FNR { valid[$0]=1; next } NF && !valid[$0]' review-files.txt previous-pending-files.txt > dropped-pending-files.txt
           else
             cp review-files.txt candidate-files.txt
+            : > dropped-pending-files.txt
           fi
           printf '%s\n' "$review_mode" > review-mode.txt
 
@@ -184,6 +187,7 @@ jobs:
             reviewMode: fs.readFileSync('review-mode.txt', 'utf8').trim(),
             reviewedFiles: lines('reviewed-files.txt'),
             pendingFiles: lines('pending-files.txt'),
+            droppedPendingFiles: lines('dropped-pending-files.txt'),
             partiallyReviewedFiles: lines('partial-files.txt'),
             diffTruncated: lines('pending-files.txt').length > 0,
             budgetBytes: 180000,
@@ -217,6 +221,9 @@ jobs:
             const pendingFiles = fs.existsSync('pending-files.txt')
               ? fs.readFileSync('pending-files.txt', 'utf8')
               : '';
+            const droppedPendingFiles = fs.existsSync('dropped-pending-files.txt')
+              ? fs.readFileSync('dropped-pending-files.txt', 'utf8')
+              : '';
             const previousReview = fs.existsSync('previous-review.md')
               ? fs.readFileSync('previous-review.md', 'utf8')
               : '';
@@ -236,6 +243,7 @@ jobs:
               'If a previous AI review is provided, check whether its concrete issues appear to be addressed by the current diff.',
               'Do not repeat previous feedback unless it still appears unresolved.',
               'Also review newly added changes and previously pending files included in the current diff.',
+              'If any previous pending files are no longer reviewable, mention that only when it affects confidence in the review.',
               'If there are no meaningful issues, say that clearly.',
               'Write the entire review in Korean. Be concise and specific.',
               '',
@@ -254,6 +262,9 @@ jobs:
               '',
               'Files still pending after this review:',
               pendingFiles || '(none)',
+              '',
+              'Previous pending files no longer reviewable:',
+              droppedPendingFiles || '(none)',
               '',
               'Diff:',
               reviewDiff || '(No reviewable diff after excluding lock files and generated outputs.)',

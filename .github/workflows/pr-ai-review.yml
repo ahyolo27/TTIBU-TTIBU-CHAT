@@ -55,25 +55,142 @@ jobs:
       - name: Fetch PR head
         run: git fetch origin pull/${{ steps.pr.outputs.number }}/head:pr-head --depth=1
 
+      - name: Load previous review state
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- pr-ai-review -->';
+            const metaPattern = /<!-- pr-ai-review-meta:\s*([\s\S]*?)\s*-->/;
+            const issue_number = Number(process.env.PR_NUMBER);
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const previous = comments
+              .filter((comment) => comment.user.type === 'Bot' && comment.body?.includes(marker))
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+
+            let previousReview = '';
+            let previousMeta = {};
+
+            if (previous) {
+              previousReview = previous.body
+                .replace(marker, '')
+                .replace(metaPattern, '')
+                .replace(/\n?<sub>AI review[\s\S]*?<\/sub>\s*$/m, '')
+                .trim();
+
+              const metaMatch = previous.body.match(metaPattern);
+              if (metaMatch) {
+                try {
+                  previousMeta = JSON.parse(metaMatch[1]);
+                } catch (error) {
+                  core.warning(`Failed to parse previous review metadata: ${error.message}`);
+                }
+              }
+            }
+
+            const pendingFiles = Array.isArray(previousMeta.pendingFiles)
+              ? previousMeta.pendingFiles
+              : [];
+
+            fs.writeFileSync('previous-review.md', previousReview);
+            fs.writeFileSync('previous-meta.json', JSON.stringify(previousMeta, null, 2));
+            fs.writeFileSync('previous-head-sha.txt', previousMeta.headSha || '');
+            fs.writeFileSync('previous-pending-files.txt', `${pendingFiles.join('\n')}${pendingFiles.length ? '\n' : ''}`);
+
       - name: Build review input
         id: diff
         shell: bash
+        env:
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
           set -euo pipefail
+
+          REVIEW_BUDGET_BYTES=180000
 
           git diff --name-status "${{ steps.pr.outputs.base_sha }}" pr-head > changed-files.txt
           git diff --name-only "${{ steps.pr.outputs.base_sha }}" pr-head |
             grep -Ev '(^|/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb|Cargo\.lock|composer\.lock|Gemfile\.lock|Pipfile\.lock|poetry\.lock|uv\.lock)$' |
             grep -Ev '(^|/)(dist|build|coverage|\.next|\.nuxt|node_modules)/' > review-files.txt || true
 
-          if [ -s review-files.txt ]; then
-            mapfile -t review_files < review-files.txt
-            git diff --unified=24 --no-ext-diff "${{ steps.pr.outputs.base_sha }}" pr-head -- "${review_files[@]}" > pr.diff
-          else
-            : > pr.diff
-          fi
+          previous_head="$(cat previous-head-sha.txt 2>/dev/null || true)"
+          review_mode="full"
 
-          head -c 180000 pr.diff > review-diff.txt
+          if [ -n "$previous_head" ] &&
+             git cat-file -e "${previous_head}^{commit}" 2>/dev/null &&
+             git merge-base --is-ancestor "$previous_head" pr-head; then
+            review_mode="incremental"
+            git diff --name-only "$previous_head" pr-head |
+              grep -Ev '(^|/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb|Cargo\.lock|composer\.lock|Gemfile\.lock|Pipfile\.lock|poetry\.lock|uv\.lock)$' |
+              grep -Ev '(^|/)(dist|build|coverage|\.next|\.nuxt|node_modules)/' > changed-since-previous.txt || true
+
+            cat changed-since-previous.txt previous-pending-files.txt 2>/dev/null |
+              awk 'NF && !seen[$0]++ { print }' |
+              awk 'NR==FNR { valid[$0]=1; next } valid[$0]' review-files.txt - > candidate-files.txt
+          else
+            cp review-files.txt candidate-files.txt
+          fi
+          printf '%s\n' "$review_mode" > review-mode.txt
+
+          : > review-diff.txt
+          : > reviewed-files.txt
+          : > pending-files.txt
+          : > partial-files.txt
+          current_bytes=0
+
+          while IFS= read -r file; do
+            [ -n "$file" ] || continue
+
+            git diff --unified=24 --no-ext-diff "${{ steps.pr.outputs.base_sha }}" pr-head -- "$file" > file.diff || true
+            [ -s file.diff ] || continue
+
+            file_bytes="$(wc -c < file.diff | tr -d ' ')"
+            next_bytes=$((current_bytes + file_bytes))
+
+            if [ "$next_bytes" -le "$REVIEW_BUDGET_BYTES" ]; then
+              cat file.diff >> review-diff.txt
+              printf '\n' >> review-diff.txt
+              echo "$file" >> reviewed-files.txt
+              current_bytes="$next_bytes"
+            elif [ "$current_bytes" -eq 0 ]; then
+              head -c "$REVIEW_BUDGET_BYTES" file.diff > review-diff.txt
+              printf '\n' >> review-diff.txt
+              echo "$file" >> partial-files.txt
+              echo "$file" >> pending-files.txt
+              current_bytes="$REVIEW_BUDGET_BYTES"
+            else
+              echo "$file" >> pending-files.txt
+            fi
+          done < candidate-files.txt
+
+          node - <<'NODE'
+          const fs = require('fs');
+
+          const lines = (path) => fs.existsSync(path)
+            ? fs.readFileSync(path, 'utf8').split(/\r?\n/).filter(Boolean)
+            : [];
+
+          const metadata = {
+            version: 1,
+            headSha: process.env.HEAD_SHA,
+            reviewMode: fs.readFileSync('review-mode.txt', 'utf8').trim(),
+            reviewedFiles: lines('reviewed-files.txt'),
+            pendingFiles: lines('pending-files.txt'),
+            partiallyReviewedFiles: lines('partial-files.txt'),
+            diffTruncated: lines('pending-files.txt').length > 0,
+            budgetBytes: 180000,
+          };
+
+          fs.writeFileSync('review-metadata.json', JSON.stringify(metadata, null, 2));
+          NODE
 
       - name: Ask OpenAI for review
         id: openai
@@ -91,12 +208,24 @@ jobs:
             }
 
             const changedFiles = fs.readFileSync('changed-files.txt', 'utf8');
-            const reviewedFiles = fs.existsSync('review-files.txt')
-              ? fs.readFileSync('review-files.txt', 'utf8')
+            const filesIncludedInDiff = fs.existsSync('reviewed-files.txt')
+              ? fs.readFileSync('reviewed-files.txt', 'utf8')
+              : '';
+            const partiallyIncludedFiles = fs.existsSync('partial-files.txt')
+              ? fs.readFileSync('partial-files.txt', 'utf8')
+              : '';
+            const pendingFiles = fs.existsSync('pending-files.txt')
+              ? fs.readFileSync('pending-files.txt', 'utf8')
+              : '';
+            const previousReview = fs.existsSync('previous-review.md')
+              ? fs.readFileSync('previous-review.md', 'utf8')
               : '';
             const reviewDiff = fs.existsSync('review-diff.txt')
               ? fs.readFileSync('review-diff.txt', 'utf8')
               : '';
+            const reviewMetadata = fs.existsSync('review-metadata.json')
+              ? JSON.parse(fs.readFileSync('review-metadata.json', 'utf8'))
+              : {};
 
             const prompt = [
               'You are a senior software engineer reviewing a GitHub pull request.',
@@ -104,16 +233,27 @@ jobs:
               'Only comment when there is a concrete issue with clear impact.',
               'Avoid subjective style feedback.',
               'Do not comment on unchanged code unless it is directly affected by this PR.',
+              'If a previous AI review is provided, check whether its concrete issues appear to be addressed by the current diff.',
+              'Do not repeat previous feedback unless it still appears unresolved.',
+              'Also review newly added changes and previously pending files included in the current diff.',
               'If there are no meaningful issues, say that clearly.',
               'Write the entire review in Korean. Be concise and specific.',
               '',
               `PR title: ${process.env.PR_TITLE}`,
+              `Review mode: ${reviewMetadata.reviewMode || 'full'}`,
+              `Diff truncated: ${reviewMetadata.diffTruncated ? 'yes' : 'no'}`,
+              '',
+              'Previous AI review:',
+              previousReview || '(none)',
               '',
               'Changed files:',
               changedFiles,
               '',
               'Files included in the review diff:',
-              reviewedFiles || '(none)',
+              [filesIncludedInDiff, partiallyIncludedFiles].filter(Boolean).join('\n') || '(none)',
+              '',
+              'Files still pending after this review:',
+              pendingFiles || '(none)',
               '',
               'Diff:',
               reviewDiff || '(No reviewable diff after excluding lock files and generated outputs.)',
@@ -161,6 +301,7 @@ jobs:
             const marker = '<!-- pr-ai-review -->';
             const issue_number = Number(process.env.PR_NUMBER);
             const reviewBody = fs.readFileSync('ai-review.md', 'utf8');
+            const reviewMetadata = fs.readFileSync('review-metadata.json', 'utf8').trim();
             const reviewedAt = new Intl.DateTimeFormat('sv-SE', {
               timeZone: 'Asia/Seoul',
               year: 'numeric',
@@ -175,6 +316,7 @@ jobs:
               marker,
               reviewBody,
               '',
+              `<!-- pr-ai-review-meta:\n${reviewMetadata}\n-->`,
               `<sub>AI review | ${reviewedAt} KST | ${process.env.MODEL}</sub>`,
             ].join('\n');
 

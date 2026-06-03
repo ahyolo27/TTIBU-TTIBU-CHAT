@@ -27,13 +27,19 @@ public class Room extends BaseTimeEntity {
     @Column(nullable = false)
     private String name;
 
+    // TODO: 컴파일용, 추후 제거
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "branch_view", columnDefinition = "json", nullable = false)
     private String branchView;
 
+    // TODO: 컴파일용, 추후 제거
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "chat_info", columnDefinition = "json", nullable = false)
     private String chatInfo;
+
+    @Builder.Default
+    @Column(name = "graph_version", nullable = false)
+    private long graphVersion = 0L;
 
     /**
      * 새 채팅방 생성
@@ -44,6 +50,7 @@ public class Room extends BaseTimeEntity {
                 .name(name != null ? name : "새 대화방")
                 .branchView("{}")
                 .chatInfo("{}")
+                .graphVersion(0L)
                 .build();
     }
 
@@ -55,4 +62,8 @@ public class Room extends BaseTimeEntity {
             this.name = name;
         }
     }
-}   
+
+    public void bumpGraphVersion() {
+        this.graphVersion++;
+    }
+}
